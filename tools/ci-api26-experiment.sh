@@ -119,10 +119,11 @@ if not all(row['passed'] for row in results):
     raise SystemExit('At least one native suite failed; both apps were attempted once.')
 NATIVE
 printf 'Both native suites passed on API26 software emulation only. API35 runtime is not validated by this experiment.\n' > "$out/NATIVE-RESULT.txt"
-# Native failures above stop here. UI/video outcomes remain a separate hard gate.
+# Native failures above stop here. UI assertions are a separate hard gate;
+# optional host-video encoding is reported independently from real PNG captures.
 if bash "$harness/tools/ui-recovery/run_ui_smoke.sh" "$out/ui"; then
-  printf 'API26 native and bounded UI/video checks passed for both apps. API35 and physical-device runtime remain untested.\n' > "$out/RESULT.txt"
+  printf 'API26 native and bounded UI checks passed for both apps. Real PNG captures are retained; optional host-video results are in each UI report. API35 and physical-device runtime remain untested.\n' > "$out/RESULT.txt"
 else
-  printf 'API26 native checks passed; at least one bounded UI/video check failed. See per-app UI reports.\n' > "$out/RESULT.txt"
+  printf 'API26 native checks passed; at least one bounded UI check failed. See per-app UI reports for assertions and separate optional host-video results.\n' > "$out/RESULT.txt"
   exit 1
 fi

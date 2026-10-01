@@ -4,7 +4,7 @@
 Each tap uses a fresh observed hierarchy. App internals never substitute for UI.
 Screenshots and hierarchy files survive failure. No external Python dependencies.
 """
-import argparse, hashlib, json, os, re, struct, subprocess, time, traceback, xml.etree.ElementTree as ET, zlib
+import argparse, hashlib, json, os, re, struct, subprocess, time, traceback, xml.etree.ElementTree as ET, zipfile, zlib
 from pathlib import Path
 
 class UI:
@@ -29,7 +29,7 @@ class UI:
   self.seq+=1;prefix=self.out/f'{self.seq:03}-{label}'
   if png:prefix.with_suffix('.png').write_bytes(self.call('exec-out','screencap','-p'))
   self.call('shell','-n','uiautomator','dump','/sdcard/app-matrix-ui-window.xml')
-  raw=self.call('shell','-n','cat','/sdcard/app-matrix-ui-window.xml');prefix.with_suffix('.xml').write_bytes(raw)
+  raw=self.call('shell','-n','cat','/sdcard/app-matrix-ui-window.xml');prefix.with_suffix('.xml').write_bytes(raw);self.log('capture',file=prefix.name,png=png)
   return ET.fromstring(raw)
  @staticmethod
  def norm(s):return ' '.join(s.split()).casefold()
@@ -52,6 +52,8 @@ class UI:
    if 'contains' in s and self.norm(s['contains']) not in self.norm(n.get('text','')):continue
    if 'desc' in s and n.get('content-desc')!=s['desc']:continue
    if 'class' in s and n.get('class')!=s['class']:continue
+   if 'id' in s and n.get('resource-id')!=s['id']:continue
+   if 'package' in s and n.get('package')!=s['package']:continue
    found.append(n)
   # Prefer unique nearest clickable targets over a duplicate toolbar heading.
   if len(found)>1:
@@ -86,39 +88,37 @@ class UI:
   if 'mInputShown=true' in state:self.key('KEYCODE_BACK')
  def record_start(self,name):
   self.record_stop()
-  # Record only after this app is visibly open, never initial Android Home.
+  # Official emulator host recording bypasses API26's unsupported guest encoder.
+  # It remains optional: real timestamped PNGs and UI assertions are independent.
+  if not re.fullmatch(r'[a-z0-9-]+',name):raise ValueError('Unsafe recording name')
+  filename=name+'.webm'
   try:
-   prior=self.call('shell','-n','pidof','screenrecord').decode().strip()
-  except RuntimeError:prior=''
-  if prior:raise RuntimeError('Unexpected existing recorder; refusing to interfere')
-  log=(self.out/(name+'.screenrecord.txt')).open('wb');path='/sdcard/'+name+'.mp4'
-  process=subprocess.Popen([self.adb,'-s',self.args.serial,'shell','-n','screenrecord','--size','480x800','--bit-rate','750000','--time-limit','180',path],stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT)
-  self.recording=(name,path,process,log);self.log('record_start',name=name,max_seconds=180)
-  time.sleep(.5)
+   response=self.call('emu','screenrecord','start','--size','480x800','--bit-rate','750000','--fps','10','--time-limit','180',filename,timeout=20)
+   (self.out/(name+'.screenrecord.txt')).write_bytes(response)
+   if b'KO:' in response or b'OK' not in response:raise RuntimeError(response.decode(errors='replace'))
+   self.recording=(name,filename)
+   self.log('record_start',name=name,method='official-emulator-host-webm',max_seconds=180,fps=10)
+  except Exception as e:
+   self.video_errors.append(name+': '+str(e));self.log('record_error',name=name,error=str(e))
  def record_stop(self):
   if not self.recording:return
-  name,path,process,log=self.recording;self.recording=None
-  # Bounded cleanup remains possible after the UI deadline. It only stops our
-  # recorder on this validated disposable AVD and reads its generated media.
-  def cleanup_call(*args,timeout=12):
-   p=subprocess.run([self.adb,'-s',self.args.serial,*args],stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=timeout)
-   if p.returncode:raise RuntimeError(p.stderr.decode(errors='replace'))
-   return p.stdout
+  name,filename=self.recording;self.recording=None
   try:
-   if process.poll() is None:
-    try:
-     pids=cleanup_call('shell','-n','pidof','screenrecord',timeout=5).decode().split()
-     if pids and all(p.isdigit() for p in pids):cleanup_call('shell','-n','kill','-2',*pids,timeout=5)
-    except RuntimeError:pass
-    try:process.wait(timeout=5)
-    except subprocess.TimeoutExpired:process.terminate();process.wait(timeout=2)
-   log.close();cleanup_call('pull',path,str(self.out/(name+'.mp4')))
-   data=(self.out/(name+'.mp4')).read_bytes()
-   if len(data)<1024 or data[4:8]!=b'ftyp':raise RuntimeError('Recording did not produce an MP4 container')
-   self.videos.append(name+'.mp4');self.log('record_stop',name=name,bytes=len(data))
+   # Cleanup is bounded even after the UI budget. Only our validated AVD is used.
+   p=subprocess.run([self.adb,'-s',self.args.serial,'emu','screenrecord','stop'],stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=20)
+   with (self.out/(name+'.screenrecord.txt')).open('ab') as f:f.write(p.stdout)
+   # Emulator37 confines console output to the AVD's console_out directory.
+   # Also support the documented older behavior of saving in the host CWD.
+   avd=Path(os.environ['ANDROID_AVD_HOME'])/(self.args.expected_avd+'.avd')
+   candidates=[avd/'console_out'/filename,Path.cwd()/filename]
+   source=next((p for p in candidates if p.is_file()),None)
+   if source is None:raise RuntimeError('Host recorder produced no WebM at its documented output path')
+   data=source.read_bytes()
+   if len(data)<1024 or data[:4]!=b'\x1aE\xdf\xa3' or b'webm' not in data[:128]:raise RuntimeError('Host recorder produced no valid-sized WebM container')
+   (self.out/filename).write_bytes(data)
+   self.videos.append(filename);self.log('record_stop',name=name,bytes=len(data),validation='WebM header and size only; independent playback review required')
   except Exception as e:
-   if process.poll() is None:process.terminate()
-   log.close();self.video_errors.append(name+': '+str(e));self.log('record_error',name=name,error=str(e))
+   self.video_errors.append(name+': '+str(e));self.log('record_error',name=name,error=str(e))
  def check(self,ok,label):
   if not ok:raise AssertionError(label)
   self.checks.append(label);self.log('check',passed=True,label=label)
@@ -139,7 +139,7 @@ class UI:
  def downloads(self):
   root=self.screen('documents-roots',png=True)
   buttons=[n for n in root.iter('node') if n.get('content-desc') in ('Show roots','Open navigation drawer','Show navigation drawer')]
-  if buttons:self.tap({'desc':buttons[0].get('content-desc')});self.tap({'text':'Downloads'})
+  if buttons:self.tap({'desc':buttons[0].get('content-desc')});self.tap({'text':'Downloads','id':'android:id/title','package':'com.android.documentsui'})
   elif not self.find(root,{'text':'Downloads'}):raise AssertionError('Cannot establish Downloads from actual picker')
  def pick(self,name):
   root=self.screen('system-picker',png=True)
@@ -149,6 +149,21 @@ class UI:
   self.downloads();n=self.tap({'class':'android.widget.EditText'});self.key('KEYCODE_MOVE_END')
   length=len(n.get('text',''));self.call('shell','-n','input','keyevent',*(['KEYCODE_DEL']*min(length+4,100)))
   self.text(name);self.hide_keyboard();self.tap({'text':'Save'});time.sleep(1)
+ def pull_complete(self,name,kind):
+  for attempt in range(5):
+   try:
+    self.call('pull','/sdcard/Download/'+name,str(self.out/name));data=(self.out/name).read_bytes()
+    if kind=='jpeg' and len(data)>1000 and data.startswith(b'\xff\xd8') and data.endswith(b'\xff\xd9'):return
+    if kind=='zip':
+     with zipfile.ZipFile(self.out/name) as archive:
+      if archive.testzip() is None:return
+   except (RuntimeError,zipfile.BadZipFile):pass
+   time.sleep(1)
+  raise AssertionError(f'Actual SAF export did not finish as {kind}: {name}')
+ def export_journal_photo(self,name):
+  self.tap({'text':'Photo tools'},4);self.tap({'text':'Export current photo'});self.save_document(name);self.select({'text':'Photo tools'},4);self.pull_complete(name,'jpeg');self.screen('journal-jpeg-exported',png=True)
+ def restore_journal(self):
+  self.tap({'text':'More'});self.tap({'text':'Restore backup'});self.pick('journal-roundtrip.fjbackup');self.assert_text('Replace journal with this backup?');self.select({'contains':'1 with photos'});self.screen('journal-restore-preview',png=True)
  def export_poster(self,name):
   self.top();self.tap({'text':'Export PNG'});self.save_document(name);self.select({'text':'Export PNG'})
   self.call('pull','/sdcard/Download/'+name,str(self.out/name));self.screen('poster-exported',png=True)
@@ -180,9 +195,34 @@ def png_pixels(path):
   previous=row
  return (w,h),bytes(pixels),types
 
+def jpeg_info(data):
+ assert data[:2]==b'\xff\xd8' and data[-2:]==b'\xff\xd9','Incomplete actual JPEG';pos=2;dimensions=None;metadata=[]
+ while pos<len(data):
+  assert data[pos]==255,'Malformed JPEG marker'
+  while data[pos]==255:pos+=1
+  marker=data[pos];pos+=1
+  if marker in (0xda,0xd9):break
+  if marker in range(0xd0,0xd8) or marker==1:continue
+  length=struct.unpack('>H',data[pos:pos+2])[0];assert length>=2 and pos+length<=len(data);part=data[pos+2:pos+length]
+  if marker in (0xc0,0xc1,0xc2,0xc3,0xc5,0xc6,0xc7,0xc9,0xca,0xcb,0xcd,0xce,0xcf):dimensions=(struct.unpack('>H',part[3:5])[0],struct.unpack('>H',part[1:3])[0])
+  if marker in (0xe1,0xed,0xfe):metadata.append(marker)
+  pos+=length
+ assert dimensions,'JPEG has no size header';return dimensions,metadata
+
 def journal(u):
- pkg='dev.appmatrix.journal';u.start(pkg);u.assert_text('Field Journal');u.screen('journal-launch',png=True);u.record_start('journal-01-create-undo-save');u.tap({'contains':'New observation'});u.tap({'after_label':'TITLE'});u.text('CI River notes');u.hide_keyboard();u.tap({'after_label':'NOTES'});u.text('QA');u.screen('journal-keyboard',png=True);u.hide_keyboard();u.tap({'text':'Undo notes'},2);u.assert_field('NOTES','','What did you notice?');u.tap({'text':'Redo notes'});u.assert_field('NOTES','QA');u.screen('journal-undo-redo',png=True);u.tap({'text':'Save observation'});u.assert_text('CI River notes');u.record_stop();u.stop(pkg);u.start(pkg);u.assert_text('CI River notes');u.screen('journal-saved-reopen',png=True);u.record_start('journal-02-dirty-draft')
- u.tap({'contains':'New observation'});u.tap({'after_label':'TITLE'});u.text('CI Dirty recovery');u.hide_keyboard();u.tap({'after_label':'NOTES'});u.text('DirtyDraft');u.hide_keyboard();time.sleep(1);u.record_stop();u.stop(pkg);u.start(pkg);u.assert_text('Continue your draft?');u.record_start('journal-03-recovered-draft');u.screen('journal-dirty-recovery-prompt',png=True);u.tap({'text':'Continue editing'});u.assert_field('TITLE','CI Dirty recovery');u.assert_field('NOTES','DirtyDraft');u.screen('journal-dirty-recovered',png=True);u.tap({'text':'Back'});u.assert_text('Keep this draft?');u.screen('journal-back-dirty',png=True);u.tap({'text':'Keep draft & close'});u.tap({'text':'More'});u.tap({'text':'Settings'});u.screen('journal-settings',png=True);u.record_stop()
+ # This focused pass closes SAF photo/backup gaps. The unchanged exact app
+ # revision already has separate passing UI undo/save/dirty-recovery evidence.
+ pkg='dev.appmatrix.journal';u.start(pkg);u.assert_text('Field Journal');u.screen('journal-launch',png=True);u.record_start('journal-01-photo-edit-export')
+ u.tap({'contains':'New observation'});u.tap({'after_label':'TITLE'});u.text('CI Photo journal');u.hide_keyboard();u.tap({'after_label':'NOTES'});u.text('RiverRecord');u.hide_keyboard();u.top();heading=u.select({'text':'New observation'});hb=u.bounds(heading);u.check(hb[3]-hb[1]>=24,'Scroll-to-top exposes complete editor heading after keyboard closes');u.screen('journal-editor-top',png=True);u.tap({'text':'Add photo'},4);u.pick('synthetic.png');u.select({'text':'Photo tools'},4);u.screen('journal-photo-imported',png=True)
+ u.tap({'text':'Photo tools'});u.tap({'text':'Adjust light & color curves'});u.screen('journal-curves-open',png=True);n=u.select({'desc':'Midtones'},4);x1,y1,x2,y2=u.bounds(n);u.log('slider',node=n.attrib,fraction=.78);u.call('shell','-n','input','tap',str(round(x1+(x2-x1)*.78)),str((y1+y2)//2));u.screen('journal-curves-adjusted',png=True);u.tap({'text':'Apply'});u.select({'text':'Photo tools'},4)
+ u.tap({'text':'Photo tools'});u.tap({'text':'Rotate clockwise'});u.select({'text':'Photo tools'},4);u.screen('journal-photo-rotated',png=True);u.export_journal_photo('journal-photo.jpg');dimensions,metadata=jpeg_info((u.out/'journal-photo.jpg').read_bytes());u.check(dimensions==(480,640),'Actual SAF JPEG has rotated480x640 dimensions');u.check(not metadata,'Actual SAF JPEG has no EXIF/IPTC/comment segments');u.top();u.tap({'text':'Save observation'});u.assert_text('CI Photo journal');u.assert_text('1 observation · On this device');u.screen('journal-photo-saved',png=True);u.record_stop()
+ u.record_start('journal-02-backup-restore');u.tap({'text':'More'});u.tap({'text':'Export backup'});u.assert_text('Export a private backup');u.screen('journal-backup-warning',png=True);u.tap({'text':'Choose destination'});u.save_document('journal-roundtrip.fjbackup');u.select({'text':'More'});u.pull_complete('journal-roundtrip.fjbackup','zip');u.screen('journal-backup-exported',png=True)
+ with zipfile.ZipFile(u.out/'journal-roundtrip.fjbackup') as archive:
+  u.check(archive.testzip() is None,'Actual SAF backup passes independent ZIP CRC checks');manifest=archive.read('journal.properties').decode('iso-8859-1');u.check(re.search(r'^format=field-journal$',manifest,re.M) is not None,'Actual SAF backup has correct format');u.check(re.search(r'^count=1$',manifest,re.M) is not None,'Actual SAF backup has one committed observation');u.check('CI Photo journal' in manifest and 'RiverRecord' in manifest,'Actual SAF backup preserves committed title and notes');media=[n for n in archive.namelist() if n.startswith('media/')];u.check(len(media)==2,'Backup includes independent original and edited photo revisions')
+  for name in media:
+   data=archive.read(name);size,meta=jpeg_info(data);u.check(max(size)<=2048 and not meta,f'{name} is bounded normalized JPEG');u.check(f'sha256.{name[6:]}={hashlib.sha256(data).hexdigest()}' in manifest,f'{name} SHA256 verified independently')
+ u.tap({'contains':'New observation'});u.tap({'after_label':'TITLE'});u.text('After backup only');u.hide_keyboard();u.tap({'text':'Save observation'});u.assert_text('2 observations · On this device');u.screen('journal-before-restore',png=True);u.restore_journal();u.tap({'text':'Cancel'});u.assert_text('2 observations · On this device');u.assert_text('After backup only');u.check(True,'Cancel restore leaves both committed observations intact');u.screen('journal-restore-cancelled',png=True);u.restore_journal();u.tap({'text':'Replace journal'});u.assert_text('1 observation · On this device');u.assert_text('CI Photo journal');u.screen('journal-restored',png=True);u.record_stop();u.stop(pkg);u.start(pkg);u.assert_text('1 observation · On this device');u.assert_text('CI Photo journal');u.screen('journal-restored-reopened',png=True)
+ u.record_start('journal-03-restored-photo');u.tap({'text':'CI Photo journal'});u.select({'text':'Photo tools'},4);u.screen('journal-restored-photo',png=True);u.export_journal_photo('journal-photo-after-restore.jpg');u.check((u.out/'journal-photo.jpg').read_bytes()==(u.out/'journal-photo-after-restore.jpg').read_bytes(),'SAF restore and force-stop/reopen preserve edited JPEG export byte-for-byte');u.tap({'text':'Back'});u.tap({'text':'More'});u.tap({'text':'Settings'});u.screen('journal-settings',png=True);u.record_stop()
 
 def poster(u):
  pkg='dev.appmatrix.poster';u.start(pkg);u.assert_text('Pocket Poster');u.screen('poster-launch',png=True);u.record_start('poster-01-import-curves-export');u.tap({'contains':'Import an image'});u.screen('poster-picker-cancel-before',png=True);u.key('KEYCODE_BACK');u.assert_text('Make something worth sharing');u.check(True,'System picker Back preserves empty library');u.tap({'contains':'Import an image'});u.pick('synthetic.png');u.select({'text':'Save project'});u.screen('poster-imported',png=True);u.tap({'text':'Save project'});u.export_poster('poster-baseline.png');u.curves(False);u.export_poster('poster-cancel-curves.png');u.check((u.out/'poster-baseline.png').read_bytes()==(u.out/'poster-cancel-curves.png').read_bytes(),'Cancelled curve edit leaves actual SAF PNG bytes unchanged');u.curves(True);u.top();u.tap({'text':'Save project'});u.record_stop();u.stop(pkg);u.start(pkg);u.select({'text':'Export PNG'});u.record_start('poster-02-reopen-export');u.screen('poster-saved-reopened',png=True);u.export_poster('poster-reopened-curved.png');u.tap({'text':'Settings'});u.screen('poster-settings',png=True);u.record_stop()
@@ -191,7 +231,7 @@ def poster(u):
 def main():
  ap=argparse.ArgumentParser();ap.add_argument('app',choices=['journal','poster']);ap.add_argument('--out',required=True);ap.add_argument('--fixtures',required=True);ap.add_argument('--serial',default='emulator-5554');ap.add_argument('--expected-avd',default='app-matrix-ci-api26');ap.add_argument('--budget-seconds',type=int,default=360);args=ap.parse_args();u=None
  try:
-  u=UI(args);globals()[args.app](u);result={'status':'failed' if u.video_errors else 'passed','ui_status':'passed','app':args.app,'runtime_api':26,'checks':u.checks,'videos':u.videos,'video_errors':u.video_errors};(u.out/'RESULT.json').write_text(json.dumps(result,indent=2));print(json.dumps(result));return 1 if u.video_errors else 0
+  u=UI(args);globals()[args.app](u);result={'status':'passed','ui_status':'passed','app':args.app,'runtime_api':26,'checks':u.checks,'videos':u.videos,'video_errors':u.video_errors};(u.out/'RESULT.json').write_text(json.dumps(result,indent=2));print(json.dumps(result));return 0
  except Exception as e:
   result={'status':'failed','app':args.app,'runtime_api':26,'error':str(e),'checks':u.checks if u else []};Path(args.out).mkdir(parents=True,exist_ok=True);(Path(args.out)/'RESULT.json').write_text(json.dumps(result,indent=2));print(json.dumps(result));traceback.print_exc()
   if u:

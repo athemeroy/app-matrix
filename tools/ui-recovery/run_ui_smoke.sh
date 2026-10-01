@@ -10,11 +10,12 @@ python3 "$here/generate_fixture.py" "$out/fixtures" || exit 1
 adb="$ANDROID_HOME/platform-tools/adb"
 timeout 30 "$adb" -s emulator-5554 shell -n mkdir -p /sdcard/Download || exit 1
 timeout 45 "$adb" -s emulator-5554 push "$out/fixtures/synthetic.png" /sdcard/Download/synthetic.png || exit 1
-# Journal first: prioritize actual EditText / undo / persistence evidence.
+# Journal first: close actual photo/JPEG/backup/restore SAF integration gaps.
 # Apps have separate private data; failure in one UI plan does not hide the other.
 overall=0
 for app in journal poster; do
- if timeout 375 python3 "$here/ui_smoke.py" "$app" --out "$out/$app-ui" --fixtures "$out/fixtures" --budget-seconds 360 > "$out/$app-ui/driver.txt" 2>&1; then
+ budget=600; [[ $app != poster ]] || budget=420
+ if timeout "$((budget + 20))" python3 "$here/ui_smoke.py" "$app" --out "$out/$app-ui" --fixtures "$out/fixtures" --budget-seconds "$budget" > "$out/$app-ui/driver.txt" 2>&1; then
   printf 'passed\n' > "$out/$app-ui/EXIT-RESULT.txt"
  else
   code=$?;printf 'failed exit=%s\n' "$code" > "$out/$app-ui/EXIT-RESULT.txt";overall=1
