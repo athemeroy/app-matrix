@@ -10,11 +10,11 @@ No Telegram account, login, API or server is required. Reusable engines have the
 
 | Product | Primary engine | Status |
 | --- | --- | --- |
-| [Oritwig Codes](https://github.com/athemeroy/oritwig-codes) | ZXing 3.5.4, the third-party barcode library Telegram uses | Developer preview verified on Android 26. Read codes from images, inspect/copy/share text, generate QR and export PNG. See its README for tests and real demonstrations |
-| Oritwig Voice | RNNoise, retained from the version vendored by Telegram | App validation and media in progress; not a published release |
-| Oritwig Photo | Telegram's real GLES photo filters, native enhancement and crop geometry | App validation and media in progress; not a published release |
+| [Oritwig Codes](https://github.com/athemeroy/oritwig-codes) | ZXing 3.5.4, the third-party barcode library Telegram uses | Developer preview verified on Android 8 / API 26. Read codes from images, inspect/copy/share text, generate QR and export PNG. See its README for tests and real demonstrations |
+| Oritwig Voice | RNNoise, retained from the version vendored by Telegram | Tested developer APK available; complete source publication is still being prepared |
+| [Oritwig Photo](https://github.com/athemeroy/oritwig-photo) | Telegram's real GLES photo filters, native enhancement and crop geometry | Developer preview verified on Android 8 / API 26. Import, adjust, crop/rotate/mirror, export PNG and resume. Its README includes 14 actual screenshots and a 52-second walkthrough |
 
-The eventual goal is **20 genuinely useful complete apps**, not 20 placeholders or renamed copies.
+The eventual goal is **20 genuinely useful complete apps**, not 20 placeholders or renamed copies. The next module-first work is Oritwig Player (local Media3 playback); Oritwig Motion (local animation inspection/export) is queued. These are not yet accepted products.
 
 ZXing and RNNoise are **not Telegram-authored**. Their original authors and licenses remain visible. Engines are not counted as apps, and cosmetic variants do not count as separate products.
 
@@ -25,11 +25,13 @@ ZXing and RNNoise are **not Telegram-authored**. Their original authors and lice
 - Independent build/install instructions, complete corresponding source and licenses
 - Actual screenshots and demo video, with tested and untested behavior distinguished
 
-Device evidence is reported precisely. An Android 26 emulator result does not establish Android 35 or physical-device coverage. Development-signed APKs are labeled accordingly.
+Device evidence is reported precisely. An Android API 26 emulator result does not establish API 35 or physical-device coverage. Development-signed APKs are labeled accordingly.
+
+Local and CI debug builds can have different signing keys, so an in-place update is not guaranteed. Export wanted files before uninstalling a preview: uninstalling removes its private session/data. No production signing keys are distributed.
 
 ## Reusable modules
 
-The photo and RNNoise modules are being separated into focused engine repositories. They retain independent license boundaries; a ZXing-only app does not acquire an unrelated GPL photo dependency. Consumers pin exact engine source and include the applicable notices and build inputs.
+[oritwig-photo-engine](https://github.com/athemeroy/oritwig-photo-engine) is independently buildable and verified in a separate consumer. The RNNoise module is also independently tested; its public source package is still being prepared. Each retains its own license boundary, so a ZXing-only app does not acquire an unrelated GPL photo dependency. Consumers pin exact engine source and include applicable notices and build inputs.
 
 ## Superseded previews
 
