@@ -1,0 +1,65 @@
+name: Manual API26 software experiment
+on:
+  workflow_dispatch:
+    inputs:
+      poster_commit:
+        description: Exact 40-character oritwig-poster commit
+        required: true
+        type: string
+      journal_commit:
+        description: Exact 40-character oritwig-journal commit
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: api26-software-experiment
+  cancel-in-progress: false
+jobs:
+  one-software-boot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      POSTER_COMMIT: ${{ inputs.poster_commit }}
+      JOURNAL_COMMIT: ${{ inputs.journal_commit }}
+    steps:
+      - name: Require immutable source revisions
+        run: |
+          [[ "$POSTER_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$JOURNAL_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          path: harness
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: athemeroy/oritwig-poster
+          ref: ${{ inputs.poster_commit }}
+          path: poster
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: athemeroy/oritwig-journal
+          ref: ${{ inputs.journal_commit }}
+          path: journal
+          persist-credentials: false
+      - name: Install pinned JDK
+        run: |
+          ./harness/tools/setup-jdk.sh "$RUNNER_TEMP/app-matrix-jdk"
+          echo "JAVA_HOME=$RUNNER_TEMP/app-matrix-jdk" >> "$GITHUB_ENV"
+          echo "$RUNNER_TEMP/app-matrix-jdk/bin" >> "$GITHUB_PATH"
+      - name: Install isolated SDK with compile and target API35
+        run: |
+          echo "ANDROID_HOME=$RUNNER_TEMP/api26-experiment-sdk" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$RUNNER_TEMP/api26-experiment-sdk" >> "$GITHUB_ENV"
+          ANDROID_HOME="$RUNNER_TEMP/api26-experiment-sdk" ANDROID_SDK_ROOT="$RUNNER_TEMP/api26-experiment-sdk" ./harness/tools/setup-android-sdk.sh --accept-sdk-license
+      - name: Attempt one bounded API26 software boot and native suites
+        run: ./harness/tools/ci-api26-experiment.sh "$GITHUB_WORKSPACE/poster" "$GITHUB_WORKSPACE/journal"
+      - name: Preserve success or failure diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: api26-software-experiment-${{ github.run_id }}
+          path: harness/artifacts/api26-experiment/
+          if-no-files-found: warn
+          retention-days: 14

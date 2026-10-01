@@ -1,22 +1,13 @@
-App Matrix
+Oritwig catalog and cross-repository test harness
 
-Original App Matrix contributions are licensed under GNU GPL version 3 or,
-at your option, any later version (GPL-3.0-or-later). See LICENSE.
+Original catalog text and helper scripts are licensed under GNU GPL version 3
+or, at your option, any later version (GPL-3.0-or-later). See LICENSE.
 
-This project includes modified portions of Telegram for Android, licensed
-under GNU GPL version 2 or later. Original notices are retained in the
-corresponding source files. Distribution of the combined apps uses the
-upstream license's later-version option, under GPL version 3 or later.
+The independently versioned Core, Poster and Journal repositories carry their
+own complete source, retained upstream notices and distribution instructions:
+https://github.com/athemeroy/oritwig-core
+https://github.com/athemeroy/oritwig-poster
+https://github.com/athemeroy/oritwig-journal
 
-Field Journal includes adapted public-domain editing-history code from Markor,
-plus Gregor Santner's findDiff helper under its Unlicense option. The exact
-upstream notices and adaptation scope are preserved in third_party/MARKOR.md
-and third_party/licenses/Markor-*.txt. No exclusive rights over the upstream
-public-domain material are claimed.
-
-Telegram-derived files and changes are listed in third_party/TELEGRAM.md.
-The Gradle wrapper's own Apache-2.0 license and notices are preserved under
-third_party/gradle/. Build dependencies retain their respective licenses.
-
-Telegram names are used only for source attribution. App Matrix is not an
-official Telegram product and does not require or connect to Telegram.
+Telegram and Markor names describe the source provenance of capabilities in
+those repositories. Oritwig is not affiliated with or endorsed by them.

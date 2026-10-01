@@ -1,7 +1,4 @@
-.gradle/
-**/build/
-local.properties
-*.iml
-.idea/
-.DS_Store
 artifacts/
+__pycache__/
+*.pyc
+.DS_Store
