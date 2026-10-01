@@ -6,7 +6,7 @@ Each Oritwig app is built around one substantial mature engine, with Telegram-de
 
 No Telegram account, login, API or server is required. Reusable engines have their own boundaries; an app can be downloaded, built and run independently.
 
-## Products
+## Working previews
 
 | Product | Primary engine | Status |
 | --- | --- | --- |
@@ -14,14 +14,18 @@ No Telegram account, login, API or server is required. Reusable engines have the
 | [Oritwig Voice](https://github.com/athemeroy/oritwig-voice) | RNNoise, retained from the version vendored by Telegram | Developer preview verified on Android 8 / API 26. Record or import supported WAV, clean speech locally, compare and export. Source, screenshots and a silent workflow video are published; the pinned source build passes CI |
 | [Oritwig Photo](https://github.com/athemeroy/oritwig-photo) | Telegram's real GLES photo filters, native enhancement and crop geometry | Developer preview verified on Android 8 / API 26. Import, adjust, crop/rotate/mirror, export PNG and resume. Its README includes 14 actual screenshots and a 52-second walkthrough |
 
-The eventual goal is **20 genuinely useful complete apps**, not 20 placeholders or renamed copies. Oritwig Player (local Media3 playback) and Oritwig Motion (vector-animation inspection/export) are being validated. A Telegram-based video-preparation module is in proof development. These are not yet accepted products.
+The eventual goal is **20 genuinely useful complete apps**, not 20 placeholders or renamed copies. Functional previews and differentiated reusable components are separate milestones: each candidate must explain what it adds over directly using an existing open-source component.
+
+Oritwig Player is a **reference app/template around Media3**, not a new playback engine or a proven improvement over existing players. Motion is a **historical renderer workbench preview**: [Samsung rlottie is deprecated and no longer receives maintenance or security support](https://github.com/Samsung/rlottie#readme). Limit the current Motion preview to self-authored test animations; it is not recommended as a default dependency for new projects or for untrusted files. Public source closeout for these previews is in progress.
+
+Video-preparation and screenshot-markup proof development is **paused for comparison with ready components**, including [Media3 Transformer](https://developer.android.com/media/media3/transformer/transformations) and [PhotoEditor](https://github.com/burhanrashid52/PhotoEditor). Their tested extraction work is preserved, but neither is an accepted additional app/component. Telegram provenance alone is not an incremental capability.
 
 ZXing and RNNoise are **not Telegram-authored**. Their original authors and licenses remain visible. Engines are not counted as apps, and cosmetic variants do not count as separate products.
 
 ## What each repository explains
 
 - Exact primary upstream revision, retained core, adaptations and capability differences
-- Why the standalone app is useful, plus every necessary newly written component
+- Why the standalone app is useful, what reusable integration work remains beyond existing ready components, and every necessary newly written component
 - Independent build/install instructions, complete corresponding source and licenses
 - Actual screenshots and demo video, with tested and untested behavior distinguished
 
