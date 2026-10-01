@@ -1,46 +1,40 @@
 # Oritwig · 源枝
 
-**Shared open-source capabilities. Independent Android apps.**
+**Mature open-source engines. Complete, independent Android apps.**
 
-Oritwig separates useful capabilities from mature open-source projects and combines them into complete, standalone products. Each app has its own repository, launcher, private data, settings, build and export/backup flows.
+Each Oritwig app is built around one substantial mature engine, with Telegram-derived modules preferred where they fit. The engine remains the source of the product's core behavior. New code supplies a focused Android shell, platform adapters and clearly explained gaps.
 
-## Repositories
+No Telegram account, login, API or server is required. Reusable engines have their own boundaries; an app can be downloaded, built and run independently.
 
-| Repository | What it contains |
-| --- | --- |
-| [oritwig-core](https://github.com/athemeroy/oritwig-core) | Reusable Telegram-derived photo curves, Markor-derived text undo/redo, and original Android image/appearance helpers |
-| [oritwig-poster](https://github.com/athemeroy/oritwig-poster) | Pocket Poster: import an image, compose it, save an editable project, and export PNG |
-| [oritwig-journal](https://github.com/athemeroy/oritwig-journal) | Field Journal: dated notes and photos, text undo/redo, search/tags, and validated backup/restore |
+## Products
 
-The app repositories contain a pinned copy of the shared source, with an immutable Core commit and per-file SHA-256 verification. Downloading one app repository is enough to build it. Neither app requires the other, a sibling checkout, Telegram, a server, an account or a paid model service.
+| Product | Primary engine | Status |
+| --- | --- | --- |
+| [Oritwig Codes](https://github.com/athemeroy/oritwig-codes) | ZXing 3.5.4, the third-party barcode library Telegram uses | Developer preview verified on Android 26. Read codes from images, inspect/copy/share text, generate QR and export PNG. See its README for tests and real demonstrations |
+| Oritwig Voice | RNNoise, retained from the version vendored by Telegram | App validation and media in progress; not a published release |
+| Oritwig Photo | Telegram's real GLES photo filters, native enhancement and crop geometry | App validation and media in progress; not a published release |
 
-## Current development preview
+The eventual goal is **20 genuinely useful complete apps**, not 20 placeholders or renamed copies.
 
-These are development builds, not a production release or a claim of completed device acceptance.
+ZXing and RNNoise are **not Telegram-authored**. Their original authors and licenses remain visible. Engines are not counted as apps, and cosmetic variants do not count as separate products.
 
-- Core commit [6e6bf168](https://github.com/athemeroy/oritwig-core/commit/6e6bf168a49d4f68645bd55210a59e17f82deef7): standalone AAR, lint and 45 JVM tests passed in [GitHub CI](https://github.com/athemeroy/oritwig-core/actions/runs/36866905623)
-- Poster commit [643ed5fa](https://github.com/athemeroy/oritwig-poster/commit/643ed5faa115a4ccc7741ea55ede1ab500dea7b3): build/package job passed, including 45 shared and 11 app JVM tests; [build outputs and reports](https://github.com/athemeroy/oritwig-poster/actions/runs/36869520624)
-- Journal commit [e486c4d4](https://github.com/athemeroy/oritwig-journal/commit/e486c4d4b495d96b67606f59777aa2a7f9051969): build/package job passed, including 45 shared tests and two regression wrappers covering 135 store/draft checks; [build outputs and reports](https://github.com/athemeroy/oritwig-journal/actions/runs/36869593935)
+## What each repository explains
 
-The generated APK/source bundles were checked against their exact commits, license notices, embedded Core lock, repository URL and signing state. Debug APKs use development signing; release APKs are intentionally unsigned.
+- Exact primary upstream revision, retained core, adaptations and capability differences
+- Why the standalone app is useful, plus every necessary newly written component
+- Independent build/install instructions, complete corresponding source and licenses
+- Actual screenshots and demo video, with tested and untested behavior distinguished
 
-**Native installation, UI workflows and Android 35 runtime acceptance are still pending.** The API 35 jobs stopped at the runner's KVM-access preflight before executing app tests, so their overall workflows are not green. This is not an app-test pass. The catalog includes one manual, bounded API 26 software-emulator experiment; an API 26 result would not establish API 35 coverage.
+Device evidence is reported precisely. An Android 26 emulator result does not establish Android 35 or physical-device coverage. Development-signed APKs are labeled accordingly.
 
-## Why separate repositories?
+## Reusable modules
 
-- Product navigation, data and releases belong to each app
-- Shared capabilities have a clear source and license boundary
-- Core updates are explicit, reviewed source changes rather than floating branch dependencies
-- Every binary bundle includes its matching complete corresponding source and build inputs
+The photo and RNNoise modules are being separated into focused engine repositories. They retain independent license boundaries; a ZXing-only app does not acquire an unrelated GPL photo dependency. Consumers pin exact engine source and include the applicable notices and build inputs.
 
-Exact Telegram and Markor source revisions, retained notices and modifications are documented in Core and mirrored into each app. The products are not affiliated with or endorsed by those upstream projects.
+## Superseded previews
 
-## Build or contribute
-
-Use the README and pinned toolchain instructions in the repository you want to build. The app package IDs remain `dev.appmatrix.poster` and `dev.appmatrix.journal` to preserve existing development-install data; the repositories form the Oritwig series.
-
-This repository is the catalog and cross-repository test harness. It does not contain another app or an alternate shared library. The manual runtime workflow requires exact immutable app commits and performs no KVM permission changes.
+[oritwig-core](https://github.com/athemeroy/oritwig-core), [oritwig-poster](https://github.com/athemeroy/oritwig-poster) and [oritwig-journal](https://github.com/athemeroy/oritwig-journal) are earlier development previews retained for source history. They are not the current upstream-first product releases. The older manual test harness in this catalog applies only to those previews.
 
 ## License
 
-Catalog text and original helper scripts are [GPL-3.0-or-later](LICENSE). Each product repository contains the full applicable upstream notices and complete corresponding source. Check those notices when reusing or distributing the apps or Core.
+Catalog text and original catalog helpers are [GPL-3.0-or-later](LICENSE). Each app and engine has its own applicable license and attribution. No upstream affiliation or endorsement is implied.
